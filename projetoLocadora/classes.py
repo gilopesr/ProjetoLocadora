@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float, Date
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 
 #criação e conexão do banco de dados com POO
@@ -31,7 +31,7 @@ class Locacao(Base):
     __tablename__ = 'locação'
     
     id = Column(Integer, primary_key=True)
-    data = Column(String)
+    data = Column(Date)
     disponibilidade = Column(Integer)
     
     
@@ -88,9 +88,12 @@ def cadastrar_cliente(nome, cpf, dataNasc, sexo):
     session.add(cliente)
     session.commit()
 
+def fazer_locacao():
+    pass
+
 #adicionar diretor
-# nome = input('Nome do Diretor: ')
-# nacionalidade = input('nacionalidade do diretor')
+# nome = 'giovana' #input('Nome do Diretor: ') 
+# nacionalidade = 'brasil' #input('nacionalidade do diretor')
 # adicionar_diretor(nome, nacionalidade)
 
 #adicionar cliente
