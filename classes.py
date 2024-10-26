@@ -174,7 +174,7 @@ def devolucao(nomeFilme, cpf):
 
 
 # excluir diretor Solicitando o ID do diretor ao usuário
-#id_diretor_str = input('id Diretor: ')
+#id_diretor_str = input('id Diretor que deseja excluir: ')
 #print("excluido com sucesso")
 #try:
 #   id_diretor = int(id_diretor_str)
@@ -190,7 +190,7 @@ def devolucao(nomeFilme, cpf):
 #sexo = input('sexo: ')
 #cadastrar_cliente(nome, cpf, dataNasc, sexo)
 
-# #excluir cliente
+#excluir cliente
 cpf_usuario = input("Digite o CPF do cliente que deseja excluir: ")
 excluir_cliente(cpf_usuario)
 
