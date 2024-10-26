@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float, Date
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
-from datetime import date
+from datetime import date, timedelta
 
 
 #criação e conexão do banco de dados com POO
@@ -39,7 +39,7 @@ class Locacao(Base):
     
     id = Column(Integer, primary_key=True)
     nomeFilme = Column(String)
-    data = date.today()
+    data = Column(Date)
     disponibilidade = Column(Integer)
     cliente_cpf = Column(Integer, ForeignKey('clientes.cpf'))
     cliente = relationship('Cliente', backref='locação')
@@ -102,17 +102,23 @@ def cadastrar_cliente(nome, cpf, dataNasc, sexo):
     session.add(cliente)
     session.commit()
 
-def fazer_locacao(nomeFilme, nomeCliente, cpf):
+def fazer_locacao(nomeFilme, cpf):
     filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
     if not filme or filme.qtdDisponivel <= 0:
         print("O filme está indisponível para locação no momento")
         return
     
-    locacao = Locacao(nomeFilme=nomeFilme, cliente=nomeCliente,cliente_cpf=cpf)
+    cliente = session.query(Cliente).filter_by(cpf=cpf).first()
+    if not cliente:
+        print("Cliente não encontrado.")
+        return
+    
+    locacao = Locacao(nomeFilme=nomeFilme, cliente_cpf=cpf)
+    locacao.data = date.today()
     filme.qtdDisponivel -= 1
     session.add(locacao)
     session.commit()
-
+    print(f'Locação realizada! devolver em {locacao.data + timedelta(days=5)}')
 
 
 def consultar_filmes():
@@ -125,7 +131,19 @@ def consultar_diretores():
     for diretor in diretores:
         print(diretor)
 
-def consulta_emprestimos():
+def consulta_locacoes():
+    #faz acesso a tabela que queremos utilizar
+    locacoes = session.query(Locacao).all()
+    if not locacoes:
+        print("Não há locações registradas.")
+        return
+
+    for locacao in locacoes:
+        cliente_nome = locacao.cliente.nome
+        print(f'Locação ID: {locacao.id}\n Nome do Filme: {locacao.nomeFilme}\n Data: {locacao.data}\n Cliente: {cliente_nome}')
+        print('-'*20)
+
+def devolucao(nomeFilme, cpf):
     pass
 
 #adicionar diretor
@@ -141,15 +159,17 @@ def consulta_emprestimos():
 # cadastrar_cliente(nome, cpf, dataNasc, sexo)
 
 # consultar_diretores()
-# titulo = 'harry potter 2'
-# ano = 2012
+# titulo = 'barbie'
+# ano = 2010
 # diretor = 'jk'
 # qtdDisponivel = 3
 # adicionar_filme(titulo, ano, diretor, qtdDisponivel)
 
-nomeFilme = 'harry potter 2'
-nomeCliente = 'giovana'
-cpf = 1234678
-fazer_locacao(nomeFilme, nomeCliente, cpf)
+# nomeFilme = 'barbie'
+# nomeCliente = 'giovana'
+# cpf = 12345678
+# fazer_locacao(nomeFilme, nomeCliente, cpf)
+
+#consulta_locacoes()
 
 
