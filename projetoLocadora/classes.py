@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float, Date
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 from datetime import date, timedelta
-
+from sqlalchemy import delete
 
 #criação e conexão do banco de dados com POO
 engine = create_engine('sqlite:///locadora.db')
@@ -82,6 +82,14 @@ def adicionar_diretor(nome, nacionalidade):
         session.add(diretor)
         session.commit()
 
+def excluir_diretor(id_diretor):
+    
+    stmt = delete(Diretor).where(Diretor.id == id_diretor)
+
+    session.execute(stmt)
+    session.commit()
+
+
 def adicionar_filme(titulo, anoLancamento, diretor, qtdDisponivel):
     diretor = session.query(Diretor).filter_by(nome=diretor).first()
     if not diretor:
@@ -101,6 +109,19 @@ def cadastrar_cliente(nome, cpf, dataNasc, sexo):
     cliente = Cliente(nome=nome, cpf=cpf, dataNasc=dataNasc, sexo=sexo)
     session.add(cliente)
     session.commit()
+
+def excluir_cliente(cpf):
+    try:
+        stmt = delete(Cliente).where(Cliente.cpf == cpf)
+
+        session.execute(stmt, {'cpf': cpf})
+        session.commit()
+
+        print(f"Cliente com CPF {cpf} excluído com sucesso.")
+
+    except Exception as e:
+        print(f"Erro ao excluir cliente com CPF {cpf}: {str(e)}")
+
 
 def fazer_locacao(nomeFilme, cpf):
     filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
@@ -145,6 +166,35 @@ def consulta_locacoes():
 
 def devolucao(nomeFilme, cpf):
     pass
+
+#adicionar diretor
+#nome = input('Nome do Diretor: ') 
+#nacionalidade = input('nacionalidade do diretor: ')
+#adicionar_diretor(nome, nacionalidade)
+
+
+# excluir diretor Solicitando o ID do diretor ao usuário
+#id_diretor_str = input('id Diretor: ')
+#print("excluido com sucesso")
+#try:
+#   id_diretor = int(id_diretor_str)
+#   excluir_diretor(id_diretor)
+#except ValueError:
+#   print("ID do diretor inválido. Por favor, insira um número inteiro.")
+
+
+#adicionar cliente
+#nome= input('Nome do cliente que deseja adicionar: ')
+#cpf = input('cpf: ')
+#dataNasc = input('Data de Nascimento: ')
+#sexo = input('sexo: ')
+#cadastrar_cliente(nome, cpf, dataNasc, sexo)
+
+# #excluir cliente
+# cpf_usuario = input("Digite o CPF do cliente que deseja excluir: ")
+# excluir_cliente(cpf_usuario)
+
+#---------------------------
 
 #adicionar diretor
 # nome = input('Nome do Diretor: ') 
