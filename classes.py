@@ -26,9 +26,10 @@ class Filme(Base):
     id = Column(Integer, primary_key=True)
     titulo = Column(String)
     anoLancamento = Column(Integer)
-    qtdDisponivel = Column(Integer)
     diretor_id = Column(Integer, ForeignKey('diretores.id'))
     diretor = relationship('Diretor', backref='filmes')
+    qtdDisponivel = Column(Integer)
+    
 
     def __repr__(self):
         return f'Filme: (titulo={self.titulo}, diretor={self.diretor.nome})'
@@ -40,7 +41,7 @@ class Locacao(Base):
     id = Column(Integer, primary_key=True)
     nomeFilme = Column(String)
     data = Column(Date)
-    disponibilidade = Column(Integer)
+    data_devolucao = Column(Date)
     cliente_cpf = Column(Integer, ForeignKey('clientes.cpf'))
     cliente = relationship('Cliente', backref='locação')
     funcionario_id = Column(Integer, ForeignKey('funcionarios.id'))
@@ -83,7 +84,6 @@ def adicionar_diretor(nome, nacionalidade):
         session.commit()
 
 def excluir_diretor(id_diretor):
-    
     stmt = delete(Diretor).where(Diretor.id == id_diretor)
 
     session.execute(stmt)
@@ -136,10 +136,11 @@ def fazer_locacao(nomeFilme, cpf):
     
     locacao = Locacao(nomeFilme=nomeFilme, cliente_cpf=cpf)
     locacao.data = date.today()
+    locacao.data_devolucao = locacao.data + timedelta(weeks=1)
     filme.qtdDisponivel -= 1
     session.add(locacao)
     session.commit()
-    print(f'Locação realizada! devolver em {locacao.data + timedelta(days=5)}')
+    print(f'Locação realizada! devolver em {locacao.data_devolucao}')
 
 
 def consultar_filmes():
@@ -164,13 +165,41 @@ def consulta_locacoes():
         print(f'Locação ID: {locacao.id}\n Nome do Filme: {locacao.nomeFilme}\n Data: {locacao.data}\n Cliente: {cliente_nome}')
         print('-'*20)
 
-def devolucao(nomeFilme, cpf):
-    pass
+def fazer_devolucao(id, nomeFilme, cpf):
+    filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
+    if not filme:
+        print("Filme não encontrado.")
+        return
+    # Consulta a locação pelo id e cpf
+    locacao = session.query(Locacao).filter_by(id=id, cliente_cpf=cpf).first()
+    if not locacao:
+        print("Locação não encontrada.")
+        return
+    #consultar a data da devolução para conferir a multa
+    data_hoje = date.today()
+    if data_hoje <= locacao.data_devolucao:
+        filme.qtdDisponivel += 1
+        session.commit()
+        print(f'Devolução concluida! Obrigada pela preferencia!')
+    else:
+        dias_atraso = (data_hoje - locacao.data_devolucao).days
+        multa = Multa(valor=dias_atraso * 5, data=data_hoje, cliente_cpf=cpf)
+        session.add(multa)  
+        filme.qtdDisponivel += 1
+        session.commit()  
+        print(f'Devolução atrasada! Você deve R$ {multa.valor:.2f} de multa.')
+        print('Devolução concluída com atraso! Obrigado pela preferência!')
+
+
+
 
 #adicionar diretor
-#nome = input('Nome do Diretor: ') 
-#nacionalidade = input('nacionalidade do diretor: ')
-#adicionar_diretor(nome, nacionalidade)
+# nome = input('Nome do Diretor: ') 
+# nacionalidade = input('nacionalidade do diretor: ')
+# adicionar_diretor(nome, nacionalidade)
+
+
+# consultar_diretores()
 
 
 # excluir diretor Solicitando o ID do diretor ao usuário
@@ -184,22 +213,17 @@ def devolucao(nomeFilme, cpf):
 
 
 #adicionar cliente
-#nome= input('Nome do cliente que deseja adicionar: ')
-#cpf = input('cpf: ')
-#dataNasc = input('Data de Nascimento: ')
-#sexo = input('sexo: ')
-#cadastrar_cliente(nome, cpf, dataNasc, sexo)
+# nome= input('Nome do cliente que deseja adicionar: ')
+# cpf = input('cpf: ')
+# dataNasc = input('Data de Nascimento: ')
+# sexo = input('sexo: ')
+# cadastrar_cliente(nome, cpf, dataNasc, sexo)
 
 #excluir cliente
-cpf_usuario = input("Digite o CPF do cliente que deseja excluir: ")
-excluir_cliente(cpf_usuario)
+# cpf_usuario = input("Digite o CPF do cliente que deseja excluir: ")
+# excluir_cliente(cpf_usuario)
 
 #---------------------------
-
-#adicionar diretor
-# nome = input('Nome do Diretor: ') 
-# nacionalidade = input('nacionalidade do diretor')
-# adicionar_diretor(nome, nacionalidade)
 
 #adicionar cliente
 # nome= input('Nome: ')
@@ -208,7 +232,7 @@ excluir_cliente(cpf_usuario)
 # sexo = input('sexo: ')
 # cadastrar_cliente(nome, cpf, dataNasc, sexo)
 
-# consultar_diretores()
+
 # titulo = 'barbie'
 # ano = 2010
 # diretor = 'jk'
@@ -216,10 +240,15 @@ excluir_cliente(cpf_usuario)
 # adicionar_filme(titulo, ano, diretor, qtdDisponivel)
 
 # nomeFilme = 'barbie'
-# nomeCliente = 'giovana'
 # cpf = 12345678
-# fazer_locacao(nomeFilme, nomeCliente, cpf)
+# fazer_locacao(nomeFilme, cpf)
 
-#consulta_locacoes()
+# consulta_locacoes()
+
+# teste devolução
+# id= 1
+# nomeFilme='barbie'
+# cpf= 12345678
+# fazer_devolucao(id, nomeFilme, cpf)
 
 
