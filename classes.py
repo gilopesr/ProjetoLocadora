@@ -10,6 +10,14 @@ session = Session()
 
 Base = declarative_base()
 
+#erros personalizados
+class cpfExistente(Exception):
+    pass
+
+class LimiteLocacao(Exception):
+    pass
+
+
 class Diretor(Base):
     __tablename__ = 'diretores'
     
@@ -84,9 +92,9 @@ def adicionar_diretor(nome, nacionalidade):
         session.commit()
 
 def excluir_diretor(id_diretor):
-    stmt = delete(Diretor).where(Diretor.id == id_diretor)
+    diretor = delete(Diretor).where(Diretor.id == id_diretor)
 
-    session.execute(stmt)
+    session.execute(diretor)
     session.commit()
 
 
@@ -99,6 +107,14 @@ def adicionar_filme(titulo, anoLancamento, diretor, qtdDisponivel):
     filme = Filme(titulo=titulo, anoLancamento=anoLancamento, diretor=diretor, qtdDisponivel=qtdDisponivel)
     session.add(filme)
     session.commit()
+    
+def excluir_filme(titulo):
+    filme = delete(Filme).where(Filme.titulo == titulo)
+    
+    session.execute(filme, {'Filme': titulo})
+    session.commit()
+
+    print(f"Filme: {titulo}, excluído com sucesso.")
 
 def cadastrar_cliente(nome, cpf, dataNasc, sexo):
     cliente = session.query(Cliente).filter_by(cpf=cpf).first()
@@ -112,9 +128,9 @@ def cadastrar_cliente(nome, cpf, dataNasc, sexo):
 
 def excluir_cliente(cpf):
     try:
-        stmt = delete(Cliente).where(Cliente.cpf == cpf)
+        cliente = delete(Cliente).where(Cliente.cpf == cpf)
 
-        session.execute(stmt, {'cpf': cpf})
+        session.execute(cliente, {'cpf': cpf})
         session.commit()
 
         print(f"Cliente com CPF {cpf} excluído com sucesso.")
@@ -190,7 +206,10 @@ def fazer_devolucao(id, nomeFilme, cpf):
         print(f'Devolução atrasada! Você deve R$ {multa.valor:.2f} de multa.')
         print('Devolução concluída com atraso! Obrigado pela preferência!')
 
-
+def pagar_multa():
+    #menu para pagar a multa
+    #apagar a multa automaticamente da tabela depois de paga 
+    pass
 
 
 #adicionar diretor
@@ -223,6 +242,10 @@ def fazer_devolucao(id, nomeFilme, cpf):
 # cpf_usuario = input("Digite o CPF do cliente que deseja excluir: ")
 # excluir_cliente(cpf_usuario)
 
+#excluir filme
+# titulo = input("Digite o filme que deseja excluir: ")
+# excluir_filme(titulo)
+
 #---------------------------
 
 #adicionar cliente
@@ -233,10 +256,10 @@ def fazer_devolucao(id, nomeFilme, cpf):
 # cadastrar_cliente(nome, cpf, dataNasc, sexo)
 
 
-# titulo = 'barbie'
-# ano = 2010
-# diretor = 'jk'
-# qtdDisponivel = 3
+# titulo = 'como matar uma idosa'
+# ano = 2024
+# diretor = 'lavinia braga'
+# qtdDisponivel = 10
 # adicionar_filme(titulo, ano, diretor, qtdDisponivel)
 
 # nomeFilme = 'barbie'
@@ -250,5 +273,4 @@ def fazer_devolucao(id, nomeFilme, cpf):
 # nomeFilme='barbie'
 # cpf= 12345678
 # fazer_devolucao(id, nomeFilme, cpf)
-
 
