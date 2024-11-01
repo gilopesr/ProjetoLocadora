@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float, Date
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float, Date, Boolean
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 from datetime import date, timedelta
 from sqlalchemy import delete
@@ -80,6 +80,7 @@ class Multa(Base):
     data = Column(Date)
     cliente_cpf = Column(Integer, ForeignKey('clientes.cpf'))
     cliente = relationship('Cliente', backref='multas')
+    paga = Column(Boolean, default=False)
     
 # Criação das tabelas no banco de dados
 Base.metadata.create_all(engine)
@@ -117,14 +118,17 @@ def excluir_filme(titulo):
     print(f"Filme: {titulo}, excluído com sucesso.")
 
 def cadastrar_cliente(nome, cpf, dataNasc, sexo):
-    cliente = session.query(Cliente).filter_by(cpf=cpf).first()
-    if cliente:
-        print("Esse CPF já está cadastrado")
-        return
-    
-    cliente = Cliente(nome=nome, cpf=cpf, dataNasc=dataNasc, sexo=sexo)
-    session.add(cliente)
-    session.commit()
+    try:
+        cliente = session.query(Cliente).filter_by(cpf=cpf).first()
+        if cliente:
+            raise cpfExistente("Esse CPF já está cadastrado.")
+
+        cliente = Cliente(nome=nome, cpf=cpf, dataNasc=dataNasc, sexo=sexo)
+        session.add(cliente)
+        session.commit()
+        print("Cliente cadastrado com sucesso!")
+    except cpfExistente as e:
+        print(e)
 
 def excluir_cliente(cpf):
     try:
@@ -140,23 +144,35 @@ def excluir_cliente(cpf):
 
 
 def fazer_locacao(nomeFilme, cpf):
-    filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
-    if not filme or filme.qtdDisponivel <= 0:
-        print("O filme está indisponível para locação no momento")
-        return
+    session = Session()
+    try:
+        filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
+        if not filme or filme.qtdDisponivel <= 0:
+            print("O filme está indisponível para locação no momento.")
+            return
+        
+        cliente = session.query(Cliente).filter_by(cpf=cpf).first()
+        if not cliente:
+            print("Cliente não encontrado.")
+            return
+
+        # busca locações que ainda estão ativas, que não foram devolvidas ainda ou cuja devolução está prevista para o futuro.
+        locacoes_ativas = session.query(Locacao).filter_by(cliente_cpf=cpf).filter(Locacao.data_devolucao >= date.today()).count()
+        limite_locacoes = 3  
+
+        if locacoes_ativas >= limite_locacoes:
+            raise LimiteLocacao(f"O cliente atingiu o limite de locações de {limite_locacoes} filmes.")
+
+        locacao = Locacao(nomeFilme=nomeFilme, cliente_cpf=cpf)
+        locacao.data = date.today()
+        locacao.data_devolucao = locacao.data + timedelta(weeks=1)
+        filme.qtdDisponivel -= 1
+        session.add(locacao)
+        session.commit()
+        print(f'Locação realizada! Devolver até {locacao.data_devolucao}')
     
-    cliente = session.query(Cliente).filter_by(cpf=cpf).first()
-    if not cliente:
-        print("Cliente não encontrado.")
-        return
-    
-    locacao = Locacao(nomeFilme=nomeFilme, cliente_cpf=cpf)
-    locacao.data = date.today()
-    locacao.data_devolucao = locacao.data + timedelta(weeks=1)
-    filme.qtdDisponivel -= 1
-    session.add(locacao)
-    session.commit()
-    print(f'Locação realizada! devolver em {locacao.data_devolucao}')
+    except LimiteLocacao as e:
+        print(e)  
 
 
 def consultar_filmes():
@@ -192,7 +208,7 @@ def fazer_devolucao(id, nomeFilme, cpf):
         print("Locação não encontrada.")
         return
     #consultar a data da devolução para conferir a multa
-    data_hoje = date.today()
+    data_hoje = date.today() + timedelta(days=15)
     if data_hoje <= locacao.data_devolucao:
         filme.qtdDisponivel += 1
         session.commit()
@@ -207,12 +223,36 @@ def fazer_devolucao(id, nomeFilme, cpf):
         print('Devolução concluída com atraso! Obrigado pela preferência!')
 
 def pagar_multa():
-    #menu para pagar a multa
-    #apagar a multa automaticamente da tabela depois de paga 
-    pass
+    try:
+        # exibe multas pendentes
+        multas_pendentes = session.query(Multa).filter(Multa.paga == False).all()
+        if not multas_pendentes:
+            print("Não há multas pendentes.")
+            return
+        
+        print("Multas pendentes:")
+        for multa in multas_pendentes:
+            print(f"ID: {multa.id}, Valor: R$ {multa.valor}, Data: {multa.data}")
+
+        # pega o id da multa pra pagar
+        id_multa = int(input("Digite o ID da multa que deseja pagar: "))
+
+        # encontra  a multa pelo id
+        multa = session.query(Multa).filter(Multa.id == id_multa, Multa.paga == False).first()
+        if multa:
+            multa.paga = True  
+            session.commit()  # salva na tabela
+            print(f"Multa de R$ {multa.valor} paga com sucesso!")
+        else:
+            print("Multa não encontrada ou já foi paga.")
+    except Exception as e:
+        print(f"Ocorreu um erro: {e}")
+        session.rollback()  # Reverte a transação em caso de erro
+    finally:
+        session.close()
 
 
-#adicionar diretor
+# adicionar diretor
 # nome = input('Nome do Diretor: ') 
 # nacionalidade = input('nacionalidade do diretor: ')
 # adicionar_diretor(nome, nacionalidade)
@@ -232,7 +272,7 @@ def pagar_multa():
 
 
 #adicionar cliente
-# nome= input('Nome do cliente que deseja adicionar: ')
+# nome= input('Nome: ')
 # cpf = input('cpf: ')
 # dataNasc = input('Data de Nascimento: ')
 # sexo = input('sexo: ')
@@ -248,18 +288,11 @@ def pagar_multa():
 
 #---------------------------
 
-#adicionar cliente
-# nome= input('Nome: ')
-# cpf = input('cpf: ')
-# dataNasc = input('Data de Nascimento: ')
-# sexo = input('sexo: ')
-# cadastrar_cliente(nome, cpf, dataNasc, sexo)
-
-
-# titulo = 'como matar uma idosa'
+#adicionar filme
+# titulo = 'barbie'
 # ano = 2024
 # diretor = 'lavinia braga'
-# qtdDisponivel = 10
+# qtdDisponivel = 2
 # adicionar_filme(titulo, ano, diretor, qtdDisponivel)
 
 # nomeFilme = 'barbie'
@@ -274,3 +307,4 @@ def pagar_multa():
 # cpf= 12345678
 # fazer_devolucao(id, nomeFilme, cpf)
 
+#pagar_multa()
