@@ -289,22 +289,22 @@ def pagar_multa():
 #---------------------------
 
 #adicionar filme
-# titulo = 'barbie'
-# ano = 2024
-# diretor = 'lavinia braga'
-# qtdDisponivel = 2
+# titulo = input('Titulo do filme: ')
+# ano = input('ano de lançamento: ')
+# diretor = input('diretor: ')
+# qtdDisponivel = int(input('quantidade: '))
 # adicionar_filme(titulo, ano, diretor, qtdDisponivel)
 
-# nomeFilme = 'barbie'
-# cpf = 12345678
-# fazer_locacao(nomeFilme, cpf)
+# nomeFilme = input('Titulo do filme: ')
+# cpf = input('cpf do cliente: ')
+#fazer_locacao(nomeFilme,cpf)
 
-# consulta_locacoes()
+# consultar_locacoes()
 
 # teste devolução
-# id= 1
-# nomeFilme='barbie'
-# cpf= 12345678
+# id= input('id da locação: ')
+# nomeFilme=input('Titulo do filme: ')
+# cpf= input('cpf do cliente: ')
 # fazer_devolucao(id, nomeFilme, cpf)
 
 #pagar_multa()
