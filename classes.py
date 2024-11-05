@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float, Date, Boolean
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from sqlalchemy import delete
 
 #criação e conexão do banco de dados com POO
@@ -26,7 +26,8 @@ class Diretor(Base):
     nacionalidade = Column(String)
 
     def __repr__(self):
-        return f'Diretor: {self.nome}\n filmes = {self.filmes})'
+        filmes_nome = ", ".join([filme.titulo for filme in self.filmes])
+        return f'Diretor: {self.nome} | Filmes: {filmes_nome}'
 
 class Filme(Base):
     __tablename__ = 'filmes'
@@ -42,7 +43,7 @@ class Filme(Base):
     
 
     def __repr__(self):
-        return f'Filme: (titulo={self.titulo}, diretor={self.diretor.nome})'
+        return f'Filme: {self.titulo} | diretor:{self.diretor.nome}'
 
     
 class Locacao(Base):
@@ -63,7 +64,7 @@ class Cliente(Base):
     
     cpf = Column(Integer, primary_key=True)
     nome = Column(String)
-    dataNasc = Column(String)
+    dataNasc = Column(Date)
     sexo = Column(String)
     
 class Funcionario(Base):
@@ -72,7 +73,7 @@ class Funcionario(Base):
     id = Column(Integer, primary_key=True)
     cpf = Column(Integer)
     nome = Column(String)
-    dataNasc = Column(String)
+    dataNasc = Column(Date)
     sexo = Column(String)
 
 class Multa(Base):
@@ -94,27 +95,32 @@ def adicionar_diretor(nome, nacionalidade):
         diretor = Diretor(nome=nome, nacionalidade = nacionalidade)
         session.add(diretor)
         session.commit()
+        print(f"Diretor {nome} Adicionado!")
 
 def excluir_diretor(id_diretor):
     diretor = delete(Diretor).where(Diretor.id == id_diretor)
 
     session.execute(diretor)
     session.commit()
+    print(f"Diretor Excluido")
 
 
 def adicionar_filme(titulo, anoLancamento, diretor, qtdDisponivel, funcionario_id):
     diretor = session.query(Diretor).filter_by(nome=diretor).first()
     funcionario = session.query(Funcionario).filter_by(id=funcionario_id).first()
+    
     if not diretor:
         print(f"diretor: {diretor}, não foi encontrado")
         return
+    
     if not funcionario:
-        print(f"necessita ser adicionado por um funcionario cadastrado")
+        print(f"Funcionario não encontrado")
         return
     
     filme = Filme(titulo=titulo, anoLancamento=anoLancamento,diretor=diretor, qtdDisponivel=qtdDisponivel, funcionario_id=funcionario_id)
     session.add(filme)
     session.commit()
+    print(f'filme: {titulo} adicionado a locadora!')
     
 def excluir_filme(titulo):
     filme = delete(Filme).where(Filme.titulo == titulo)
@@ -122,28 +128,46 @@ def excluir_filme(titulo):
     session.execute(filme, {'Filme': titulo})
     session.commit()
 
-    print(f"Filme: {titulo}, excluído com sucesso.")
+    print(f"Filme: {titulo} excluído com sucesso.")
 
 def cadastrar_funcionario(nome, dataNasc, cpf, sexo):
     funcionario = session.query(Funcionario).filter_by(cpf=cpf).first()
-
+    if funcionario:
+        print(f"Funcionário com CPF {cpf} já cadastrado.")
+        return
+    
+    dataNasc = datetime.strptime(dataNasc, "%d/%m/%Y").date() 
+    
     funcionario = Funcionario(nome=nome, dataNasc=dataNasc, cpf=cpf, sexo=sexo)
     session.add(funcionario)
     session.commit()
-    print("Funcionario cadastrado!")
+    print(f"Funcionário {nome} cadastrado com sucesso!")
 
-        
+
 def cadastrar_cliente(nome, cpf, dataNasc, sexo):
     try:
+        # Verifica se o cliente já existe no banco de dados
         cliente = session.query(Cliente).filter_by(cpf=cpf).first()
         if cliente:
             raise cpfExistente("Esse CPF já está cadastrado.")
-
+        
+        # Converter a string de data no formato DD/MM/AAAA para um objeto datetime
+        dataNasc = datetime.strptime(dataNasc, "%d/%m/%Y").date()
+        # Verificar se o cliente é maior de idade
+        data_atual = datetime.now()
+        idade = data_atual.year - dataNasc.year - ((data_atual.month, data_atual.day) < (dataNasc.month, dataNasc.day))
+        
+        if idade < 18:
+            raise ValueError("O cliente deve ser maior de idade para se cadastrar.")
+        
         cliente = Cliente(nome=nome, cpf=cpf, dataNasc=dataNasc, sexo=sexo)
         session.add(cliente)
         session.commit()
         print("Cliente cadastrado com sucesso!")
+    
     except cpfExistente as e:
+        print(e)
+    except ValueError as e:
         print(e)
 
 def excluir_cliente(cpf):
@@ -159,7 +183,7 @@ def excluir_cliente(cpf):
         print(f"Erro ao excluir cliente com CPF {cpf}: {str(e)}")
 
 
-def fazer_locacao(nomeFilme, cpf):
+def fazer_locacao(nomeFilme, cpf, funcionario_id):
     session = Session()
     try:
         filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
@@ -171,7 +195,12 @@ def fazer_locacao(nomeFilme, cpf):
         if not cliente:
             print("Cliente não encontrado.")
             return
-
+        
+        funcionario = session.query(Funcionario).filter_by(id=funcionario_id).first()
+        if not funcionario:
+            print("Funcionário não encontrado. Não é possível registrar a locação.")
+            return
+    
         # busca locações que ainda estão ativas, que não foram devolvidas ainda ou cuja devolução está prevista para o futuro.
         locacoes_ativas = session.query(Locacao).filter_by(cliente_cpf=cpf).filter(Locacao.data_devolucao >= date.today()).count()
         limite_locacoes = 3  
@@ -185,13 +214,13 @@ def fazer_locacao(nomeFilme, cpf):
             return
         
         
-        locacao = Locacao(nomeFilme=nomeFilme, cliente_cpf=cpf)
+        locacao = Locacao(nomeFilme=nomeFilme, cliente_cpf=cpf, funcionario_id=funcionario_id)
         locacao.data = date.today()
         locacao.data_devolucao = locacao.data + timedelta(weeks=1)
         filme.qtdDisponivel -= 1
         session.add(locacao)
         session.commit()
-        print(f'Locação realizada em: {locacao.data}\nID: {locacao.id}\n Devolver até {locacao.data_devolucao}')
+        print(f'Locação realizada em: {locacao.data} | ID: {locacao.id}\n Devolver até {locacao.data_devolucao}')
     
     except LimiteLocacao as e:
         print(e)  
@@ -201,11 +230,13 @@ def consultar_filmes():
     filmes = session.query(Filme).all()
     for filme in filmes:
         print(filme)
+        print('-'*20)
 
 def consultar_diretores():
     diretores = session.query(Diretor).all()
     for diretor in diretores:
         print(diretor)
+        print('-'*20)
 
 def consulta_locacoes():
     #faz acesso a tabela que queremos utilizar
@@ -232,7 +263,7 @@ def fazer_devolucao(id, nomeFilme, cpf):
         return
     
     #consultar a data da devolução para conferir a multa
-    data_hoje = date.today() + timedelta(days=15)
+    data_hoje = date.today() #+ timedelta(days=15) teste multa
     if data_hoje <= locacao.data_devolucao:
         filme.qtdDisponivel += 1
         session.commit()
@@ -269,6 +300,7 @@ def pagar_multa():
             print(f"Multa de R$ {multa.valor} paga com sucesso!")
         else:
             print("Multa não encontrada ou já foi paga.")
+            
     except Exception as e:
         print(f"Ocorreu um erro: {e}")
         session.rollback()  # Reverte a transação em caso de erro
@@ -276,75 +308,148 @@ def pagar_multa():
         session.close()
 
 
-# adicionar diretor
-# nome = input('Nome do Diretor: ') 
-# nacionalidade = input('nacionalidade do diretor: ')
-# adicionar_diretor(nome, nacionalidade)
+def main():
+    while True:
+        print("Bem-vindo ao sistema de locadora!")
+        print("1 - Entrar como Funcionário")
+        print("2 - Entrar como Cliente")
+        print("3 - Sair")
+        print('4 - primeiro acesso')
+        
+        opcao = input("Escolha uma opção: ")
+        
+        if opcao == '1':
+            cpf_funcionario = input("Digite seu CPF de funcionário: ")
+            funcionario = session.query(Funcionario).filter_by(cpf=cpf_funcionario).first()
+            if funcionario:
+                menu_funcionario(funcionario)
+            else:
+                print("Funcionário não encontrado. Tente novamente.")
+        
+        elif opcao == '2':
+            menu_cliente()
+                    
+        elif opcao == '4':
+            nome = str(input("Nome do novo funcionário: "))
+            dataNasc = str(input("Data de nascimento do novo funcionário (DD/MM/AAAA): "))
+            cpf = int(input("CPF do novo funcionário: "))
+            sexo = str(input("Sexo do novo funcionário (M/F): "))
+            cadastrar_funcionario(nome, dataNasc, cpf, sexo)
+            
+        elif opcao == '3':
+            print("Saindo do sistema...")
+            break
+        
+        else:
+            print("Opção inválida! Tente novamente.")
 
+# Menu de opções para Funcionário
+def menu_funcionario(funcionario):
+    while True:
+        print(f"\nBem-vindo, {funcionario.nome}!")
+        print("1 - Adicionar Diretor")
+        print("2 - Adicionar Filme")
+        print("3 - Excluir Diretor")
+        print("4 - Excluir Filme")
+        print("5 - Excluir Cliente")
+        print("6 - Cadastrar Novo Funcionário")
+        print("7 - Sair")
+        
+        opcao = input("Escolha uma opção: ")
 
-# consultar_diretores()
+        if opcao == '1':
+            nome = input("Nome do diretor: ")
+            nacionalidade = input("Nacionalidade do diretor: ")
+            adicionar_diretor(nome, nacionalidade)
+        
+        elif opcao == '2':
+            titulo = input("Título do filme: ")
+            anoLancamento = int(input("Ano de lançamento: "))
+            diretor_nome = input("Nome do diretor: ")
+            qtdDisponivel = int(input("Quantidade disponível: "))
+            funcionario_id = funcionario.id
+            adicionar_filme(titulo, anoLancamento, diretor_nome, qtdDisponivel, funcionario_id)
+        
+        elif opcao == '3':
+            id_diretor = input("ID do diretor a ser excluído: ")
+            excluir_diretor(id_diretor)
+        
+        elif opcao == '4':
+            titulo = input("Título do filme a ser excluído: ")
+            excluir_filme(titulo)
+        
+        elif opcao == '5':
+            cpf_cliente = int(input("Digite o CPF do cliente a ser excluído: "))
+            excluir_cliente(cpf_cliente)
+            
+        
+        elif opcao == '6':
+            nome = input("Nome do novo funcionário: ")
+            dataNasc = input("Data de nascimento do novo funcionário (DD/MM/AAAA): ")
+            cpf = int(input("CPF do novo funcionário: "))
+            sexo = input("Sexo do novo funcionário (M/F): ")
+            cadastrar_funcionario(nome, dataNasc, cpf, sexo)
+        
+        elif opcao == '7':
+            print("Saindo do menu de funcionário...")
+            break
+        
+        else:
+            print("Opção inválida! Tente novamente.")
 
+# Menu de opções para Cliente
+def menu_cliente():
+    while True:
+        print(f"\nBem-vindo, Oque deseja fazer hoje?")
+        print("1 - Fazer Cadastro")
+        print("2 - Fazer Locação")
+        print("3 - Fazer Devolução")
+        print("4 - Pagar Multa")
+        print("5 - Consultar Filmes")
+        print("6 - Consultar Diretores")
+        print("7 - Consultar Locações")
+        print("8 - Sair")
+        
+        opcao = input("Escolha uma opção: ")
 
-# excluir diretor Solicitando o ID do diretor ao usuário
-#id_diretor_str = input('id Diretor que deseja excluir: ')
-#print("excluido com sucesso")
-#try:
-#   id_diretor = int(id_diretor_str)
-#   excluir_diretor(id_diretor)
-#except ValueError:
-#   print("ID do diretor inválido. Por favor, insira um número inteiro.")
-
-
-#adicionar cliente
-# nome= input('Nome: ')
-# cpf = input('cpf: ')
-# dataNasc = input('Data de Nascimento: ')
-# sexo = input('sexo: ')
-# cadastrar_cliente(nome, cpf, dataNasc, sexo)
-
-#excluir cliente
-# cpf_usuario = input("Digite o CPF do cliente que deseja excluir: ")
-# excluir_cliente(cpf_usuario)
-
-#excluir filme
-# titulo = input("Digite o filme que deseja excluir: ")
-# excluir_filme(titulo)
-
-#---------------------------
-
-#adicionar filme
-# titulo = input('Titulo do filme: ')
-# ano = input('ano de lançamento: ')
-# diretor = input('diretor: ')
-# qtdDisponivel = int(input('quantidade: '))
-# adicionar_filme(titulo, ano, diretor, qtdDisponivel)
-
-# nomeFilme = input('Titulo do filme: ')
-# cpf = input('cpf do cliente: ')
-# fazer_locacao(nomeFilme,cpf)
-
-# consultar_locacoes()
-
-# teste devolução
-# id= input('id da locação: ')
-# nomeFilme=input('Titulo do filme: ')
-# cpf= input('cpf do cliente: ')
-# fazer_devolucao(id, nomeFilme, cpf)
-
-#pagar_multa()
-
-# cadastrar_funcionario('lavinia', '10/6/2005',4656821, 'f')
-
-# adicionar_diretor('greta gerwig','norte americana')
-# adicionar_filme('barbie',2023,'greta gerwig',7,1)
-
-
-# cadastrar_cliente('giovana' ,76894514523, '02/05/02', 'f')
-
-# adicionar_diretor('james cameron', 'canadense')
-# adicionar_filme('titanic',1997, 'james cameron', 1, 1 )
-# cadastrar_cliente('bruna' ,45678912354,'10/06/02', 'f')
-# cadastrar_cliente('lavinia' ,32415678964,'24/10/03', 'f')
-#fazer_locacao('titanic',32415678964)
-
-
+        if opcao == '1':
+            nome = input("Digite seu nome: ")
+            cpf_cliente = input("Digite seu CPF: ")
+            dataNasc = input("Digite sua data de nascimento (DD/MM/AAAA): ")
+            sexo = input("Digite seu sexo (M/F): ")
+            cadastrar_cliente(nome, cpf_cliente, dataNasc, sexo)
+        
+        elif opcao == '2':
+            nomeFilme = input("Digite o nome do filme que deseja alugar: ")
+            cpf_cliente = input("Digite seu CPF: ")
+            funcionario_id = int(input("Digite o ID do funcionário que registrou a locação: "))
+            fazer_locacao(nomeFilme, cpf_cliente, funcionario_id)
+            
+        elif opcao == '3':
+            id_locacao = int(input("Digite o ID da locação: "))
+            nomeFilme = input("Digite o nome do filme a ser devolvido: ")
+            cpf_cliente = input("Digite seu CPF: ")
+            fazer_devolucao(id_locacao, nomeFilme, cpf_cliente)
+        
+        elif opcao == '4':
+            pagar_multa()
+        
+        elif opcao == '5':
+            consultar_filmes()
+        
+        elif opcao == '6':
+            consultar_diretores()
+        
+        elif opcao == '7':
+            consulta_locacoes()
+            
+        elif opcao == '8':
+            print("Saindo do menu de cliente...")
+            break
+        
+        else:
+            print("Opção inválida! Tente novamente.")
+            
+            
+if __name__ == "__main__":
+    main()
