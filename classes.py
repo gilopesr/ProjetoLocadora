@@ -37,6 +37,8 @@ class Filme(Base):
     diretor_id = Column(Integer, ForeignKey('diretores.id'))
     diretor = relationship('Diretor', backref='filmes')
     qtdDisponivel = Column(Integer)
+    funcionario_id = Column(Integer, ForeignKey('funcionarios.id'))
+    funcionario = relationship('Funcionario', backref='filmes')
     
 
     def __repr__(self):
@@ -68,6 +70,7 @@ class Funcionario(Base):
     __tablename__ = 'funcionarios'
     
     id = Column(Integer, primary_key=True)
+    cpf = Column(Integer)
     nome = Column(String)
     dataNasc = Column(String)
     sexo = Column(String)
@@ -99,13 +102,17 @@ def excluir_diretor(id_diretor):
     session.commit()
 
 
-def adicionar_filme(titulo, anoLancamento, diretor, qtdDisponivel):
+def adicionar_filme(titulo, anoLancamento, diretor, qtdDisponivel, funcionario_id):
     diretor = session.query(Diretor).filter_by(nome=diretor).first()
+    funcionario = session.query(Funcionario).filter_by(id=funcionario_id).first()
     if not diretor:
         print(f"diretor: {diretor}, não foi encontrado")
         return
+    if not funcionario:
+        print(f"necessita ser adicionado por um funcionario cadastrado")
+        return
     
-    filme = Filme(titulo=titulo, anoLancamento=anoLancamento, diretor=diretor, qtdDisponivel=qtdDisponivel)
+    filme = Filme(titulo=titulo, anoLancamento=anoLancamento,diretor=diretor, qtdDisponivel=qtdDisponivel, funcionario_id=funcionario_id)
     session.add(filme)
     session.commit()
     
@@ -117,6 +124,15 @@ def excluir_filme(titulo):
 
     print(f"Filme: {titulo}, excluído com sucesso.")
 
+def cadastrar_funcionario(nome, dataNasc, cpf, sexo):
+    funcionario = session.query(Funcionario).filter_by(cpf=cpf).first()
+
+    funcionario = Funcionario(nome=nome, dataNasc=dataNasc, cpf=cpf, sexo=sexo)
+    session.add(funcionario)
+    session.commit()
+    print("Funcionario cadastrado!")
+
+        
 def cadastrar_cliente(nome, cpf, dataNasc, sexo):
     try:
         cliente = session.query(Cliente).filter_by(cpf=cpf).first()
@@ -163,13 +179,19 @@ def fazer_locacao(nomeFilme, cpf):
         if locacoes_ativas >= limite_locacoes:
             raise LimiteLocacao(f"O cliente atingiu o limite de locações de {limite_locacoes} filmes.")
 
+        multa_pendente = session.query(Multa).filter_by(cliente_cpf=cpf).filter(Multa.paga == False).first()
+        if multa_pendente:
+            print(f'É necessário fazer o pagamento da multa para alugar o filme. Multa pendente: R${multa_pendente.valor}')
+            return
+        
+        
         locacao = Locacao(nomeFilme=nomeFilme, cliente_cpf=cpf)
         locacao.data = date.today()
         locacao.data_devolucao = locacao.data + timedelta(weeks=1)
         filme.qtdDisponivel -= 1
         session.add(locacao)
         session.commit()
-        print(f'Locação realizada! Devolver até {locacao.data_devolucao}')
+        print(f'Locação realizada em: {locacao.data}\nID: {locacao.id}\n Devolver até {locacao.data_devolucao}')
     
     except LimiteLocacao as e:
         print(e)  
@@ -202,11 +224,13 @@ def fazer_devolucao(id, nomeFilme, cpf):
     if not filme:
         print("Filme não encontrado.")
         return
+    
     # Consulta a locação pelo id e cpf
     locacao = session.query(Locacao).filter_by(id=id, cliente_cpf=cpf).first()
     if not locacao:
         print("Locação não encontrada.")
         return
+    
     #consultar a data da devolução para conferir a multa
     data_hoje = date.today() + timedelta(days=15)
     if data_hoje <= locacao.data_devolucao:
@@ -297,7 +321,7 @@ def pagar_multa():
 
 # nomeFilme = input('Titulo do filme: ')
 # cpf = input('cpf do cliente: ')
-#fazer_locacao(nomeFilme,cpf)
+# fazer_locacao(nomeFilme,cpf)
 
 # consultar_locacoes()
 
@@ -308,3 +332,19 @@ def pagar_multa():
 # fazer_devolucao(id, nomeFilme, cpf)
 
 #pagar_multa()
+
+# cadastrar_funcionario('lavinia', '10/6/2005',4656821, 'f')
+
+# adicionar_diretor('greta gerwig','norte americana')
+# adicionar_filme('barbie',2023,'greta gerwig',7,1)
+
+
+# cadastrar_cliente('giovana' ,76894514523, '02/05/02', 'f')
+
+# adicionar_diretor('james cameron', 'canadense')
+# adicionar_filme('titanic',1997, 'james cameron', 1, 1 )
+# cadastrar_cliente('bruna' ,45678912354,'10/06/02', 'f')
+# cadastrar_cliente('lavinia' ,32415678964,'24/10/03', 'f')
+#fazer_locacao('titanic',32415678964)
+
+
