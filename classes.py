@@ -16,7 +16,7 @@ class cpfExistente(Exception):
 
 class LimiteLocacao(Exception):
     pass
-    
+
 class MenorDeIdade(Exception):
     pass
 
@@ -223,7 +223,8 @@ def fazer_locacao(nomeFilme, cpf, funcionario_id):
         filme.qtdDisponivel -= 1
         session.add(locacao)
         session.commit()
-        print(f'Locação realizada em: {locacao.data} | ID: {locacao.id}\n Devolver até {locacao.data_devolucao}')
+        print(f'Locação realizada em: {locacao.data} | ID: {locacao.id}')
+        print(f'Devolver até {locacao.data_devolucao}')
     
     except LimiteLocacao as e:
         print(e)  
@@ -250,35 +251,79 @@ def consulta_locacoes():
 
     for locacao in locacoes:
         cliente_nome = locacao.cliente.nome
-        print(f'Locação ID: {locacao.id}\n Nome do Filme: {locacao.nomeFilme}\n Data: {locacao.data}\n Cliente: {cliente_nome}')
+        print(f'Locação ID: {locacao.id}')
+        print(f'Nome do Filme: {locacao.nomeFilme}')
+        print(f'Data: {locacao.data}')
+        print(f'Cliente: {cliente_nome}')
         print('-'*20)
+        
+def historico_locacoes(cpf):
+    locacoes = session.query(Locacao).join(Cliente).filter(Cliente.cpf == cpf).all()
+
+    if not locacoes:
+        print(f"Não há locações registradas para o cliente {cliente_nome}.")
+        return
+
+    cliente_nome = locacoes[0].cliente.nome  # A primeira locação contém o cliente
+
+    print(f"Histórico de Locações do Cliente {cliente_nome}:")
+    for locacao in locacoes:
+        # Imprime os detalhes de cada locação
+        print(f'Locação ID: {locacao.id}')
+        print(f'Nome do Filme: {locacao.nomeFilme}')
+        print(f'Data da Locação: {locacao.data}')
+        print('-'*30)
 
 def fazer_devolucao(id, nomeFilme, cpf):
     filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
+    locacao = session.query(Locacao).filter_by(id=id, cliente_cpf=cpf).first()
     if not filme:
         print("Filme não encontrado.")
         return
-    
-    # Consulta a locação pelo id e cpf
-    locacao = session.query(Locacao).filter_by(id=id, cliente_cpf=cpf).first()
+        
+    # consulta a locação pelo id e cpf
     if not locacao:
         print("Locação não encontrada.")
         return
-    
+        
     #consultar a data da devolução para conferir a multa
     data_hoje = date.today() #+ timedelta(days=15) teste multa
     if data_hoje <= locacao.data_devolucao:
-        filme.qtdDisponivel += 1
-        session.commit()
-        print(f'Devolução concluida! Obrigada pela preferencia!')
+            filme.qtdDisponivel += 1
+            session.commit()
+            print(f'Devolução concluida! Obrigada pela preferencia!')
     else:
-        dias_atraso = (data_hoje - locacao.data_devolucao).days
-        multa = Multa(valor=dias_atraso * 5, data=data_hoje, cliente_cpf=cpf)
-        session.add(multa)  
-        filme.qtdDisponivel += 1
-        session.commit()  
-        print(f'Devolução atrasada! Você deve R$ {multa.valor:.2f} de multa.')
-        print('Devolução concluída com atraso! Obrigado pela preferência!')
+            dias_atraso = (data_hoje - locacao.data_devolucao).days
+            multa = Multa(valor=dias_atraso * 5, data=data_hoje, cliente_cpf=cpf)
+            session.add(multa)  
+            filme.qtdDisponivel += 1
+            session.commit()  
+            print(f'Devolução atrasada! Você deve R$ {multa.valor:.2f} de multa.')
+            print('Devolução concluída com atraso. Obrigado pela preferência!')
+        
+        
+def renovar_filme(id, nomeFilme, cpf):
+    filme = session.query(Filme).filter_by(titulo=nomeFilme).first()
+    locacao = session.query(Locacao).filter_by(id=id, cliente_cpf=cpf).first()
+    if not filme:
+            print("Filme não encontrado.")
+            return
+        
+        # consultar a locação pelo id e cpf 
+    if not locacao:
+            print("Locação não encontrada.")
+            return
+        
+        # verificação de datas
+    if locacao.data_devolucao < date.today():
+            print(f"Não é possível renovar, a devolução do filme {nomeFilme} está em atraso!")
+            return
+        
+    nova_data_devolucao = locacao.data_devolucao + timedelta(days=7)
+    locacao.data_devolucao = nova_data_devolucao
+    session.commit()
+        
+    print(f"A renovação foi realizada com sucesso! Nova data de devolução: {nova_data_devolucao}")
 
 def pagar_multa():
     try:
@@ -355,8 +400,9 @@ def menu_funcionario(funcionario):
         print("3 - Excluir Diretor")
         print("4 - Excluir Filme")
         print("5 - Excluir Cliente")
-        print("6 - Cadastrar Novo Funcionário")
-        print("7 - Sair")
+        print("6 - Consultar Locações")
+        print("7 - Cadastrar Novo Funcionário")
+        print("8 - Sair")
         
         opcao = input("Escolha uma opção: ")
 
@@ -385,15 +431,17 @@ def menu_funcionario(funcionario):
             cpf_cliente = int(input("Digite o CPF do cliente a ser excluído: "))
             excluir_cliente(cpf_cliente)
             
-        
         elif opcao == '6':
+            consulta_locacoes()
+            
+        elif opcao == '7':
             nome = input("Nome do novo funcionário: ")
             dataNasc = input("Data de nascimento do novo funcionário (DD/MM/AAAA): ")
             cpf = int(input("CPF do novo funcionário: "))
             sexo = input("Sexo do novo funcionário (M/F): ")
             cadastrar_funcionario(nome, dataNasc, cpf, sexo)
         
-        elif opcao == '7':
+        elif opcao == '8':
             print("Saindo do menu de funcionário...")
             break
         
@@ -406,12 +454,13 @@ def menu_cliente():
         print(f"\nBem-vindo, Oque deseja fazer hoje?")
         print("1 - Fazer Cadastro")
         print("2 - Fazer Locação")
-        print("3 - Fazer Devolução")
-        print("4 - Pagar Multa")
-        print("5 - Consultar Filmes")
-        print("6 - Consultar Diretores")
-        print("7 - Consultar Locações")
-        print("8 - Sair")
+        print("3 - Realizar Devolução")
+        print("4 - Renovar Filme")
+        print("5 - Pagar Multa")
+        print("6 - Consultar Filmes")
+        print("7 - Consultar Diretores")
+        print("8 - Histórico Locações")
+        print("9 - Sair")
         
         opcao = input("Escolha uma opção: ")
 
@@ -435,18 +484,25 @@ def menu_cliente():
             fazer_devolucao(id_locacao, nomeFilme, cpf_cliente)
         
         elif opcao == '4':
+            id_locacao = int(input("Digite o ID da locação: "))
+            nomeFilme = input("Digite o nome do filme a ser renovado: ")
+            cpf_cliente = input("Digite seu CPF: ")
+            renovar_filme(id_locacao, nomeFilme, cpf_cliente)
+            
+        elif opcao == '5':
             pagar_multa()
         
-        elif opcao == '5':
+        elif opcao == '6':
             consultar_filmes()
         
-        elif opcao == '6':
+        elif opcao == '7':
             consultar_diretores()
         
-        elif opcao == '7':
-            consulta_locacoes()
-            
         elif opcao == '8':
+            cpf = input("Digite o Cpf para consultar o histórico: ")
+            historico_locacoes(cpf)
+            
+        elif opcao == '9':
             print("Saindo do menu de cliente...")
             break
         
