@@ -404,7 +404,7 @@ def pagar_multa(cpf_cliente):
 
 def inicializar():
     if not session.query(Funcionario).first():
-        cadastrar_funcionario('sara', '01/01/2000', 15486235099, 'm')
+        cadastrar_funcionario('sara', '01/01/2000', 15486235099, 'f')
             
     if not session.query(Diretor).first():
         adicionar_diretor('greta gerwig','norte americana')
@@ -447,6 +447,8 @@ def inicializar():
         multa_lavinia = Multa(valor=10.00, data=date(2024,11,5), cliente_cpf=32415678964, paga=False)
         session.add(multa_lavinia)
         session.commit()
+        
+    fazer_devolucao(3,'oppenheimer',75395145663)
     print("Dados iniciais inseridos com sucesso!")
 
 def main():
