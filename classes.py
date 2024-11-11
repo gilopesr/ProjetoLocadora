@@ -379,35 +379,28 @@ def renovar_filme(id, nomeFilme, cpf):
         
     print(f"A renovação foi realizada com sucesso! Nova data de devolução: {nova_data_devolucao}")
 
-def pagar_multa():
-    try:
-        # exibe multas pendentes
-        multas_pendentes = session.query(Multa).filter(Multa.paga == False).all()
-        if not multas_pendentes:
-            print("Não há multas pendentes.")
-            return
+def pagar_multa(cpf_cliente):
+    multas_pendentes = session.query(Multa).filter(Multa.paga == False, Multa.cliente_cpf == cpf_cliente).all()
+    if not multas_pendentes:
+        print("Não há multas pendentes.")
+        return
         
-        print("Multas pendentes:")
-        for multa in multas_pendentes:
-            print(f"ID: {multa.id}, Valor: R$ {multa.valor}, Data: {multa.data}")
+    print("Multas pendentes:")
+    for multa in multas_pendentes:
+        print(f"ID: {multa.id}, Valor: R$ {multa.valor}, Data: {multa.data}")
 
-        # pega o id da multa pra pagar
-        id_multa = int(input("Digite o ID da multa que deseja pagar: "))
+    # pega o id da multa pra pagar
+    id_multa = int(input("Digite o ID da multa que deseja pagar: "))
 
-        # encontra  a multa pelo id
-        multa = session.query(Multa).filter(Multa.id == id_multa, Multa.paga == False).first()
-        if multa:
-            multa.paga = True  
-            session.commit()  # salva na tabela
-            print(f"Multa de R$ {multa.valor} paga com sucesso!")
-        else:
-            print("Multa não encontrada ou já foi paga.")
+    # encontra  a multa pelo id
+    multa = session.query(Multa).filter(Multa.id == id_multa, Multa.paga == False, Multa.cliente_cpf == cpf_cliente).first()
+    if multa:
+        multa.paga = True  
+        session.commit()  # salva na tabela
+        print(f"Multa de R$ {multa.valor} paga com sucesso!")
+    else:
+        print("Multa não encontrada ou já foi paga.")
             
-    except Exception as e:
-        print(f"Ocorreu um erro: {e}")
-        session.rollback()  # Reverte a transação em caso de erro
-    finally:
-        session.close()
 
 def inicializar():
     if not session.query(Funcionario).first():
@@ -423,7 +416,7 @@ def inicializar():
 
     if not session.query(Filme).first():
         adicionar_filme('barbie',2023,'greta gerwig',7,1)
-        adicionar_filme('adoraveis mulheres',2019,  'greta gerwig', 5,1)
+        adicionar_filme('adoraveis mulheres',2019, 'greta gerwig', 5,1)
         adicionar_filme('zootopia', 2016,'byron howard', 5,1 )
         adicionar_filme('bolt', 2008, 'byron howard', 2,1)
         adicionar_filme('beetlejuice', 1988, 'tim burton', 4,1)
@@ -440,7 +433,20 @@ def inicializar():
         cadastrar_cliente('pedro' ,12365495135, '14/05/2005', 'm')
         cadastrar_cliente('joão' ,75395145663, '25/01/2004', 'm')
         
-
+    if not session.query(Locacao).first():
+        fazer_locacao('a noiva cadaver', 76894514523, 1)
+        fazer_locacao('beetlejuice', 32415678964, 1)
+        fazer_locacao('oppenheimer', 75395145663, 1)
+        fazer_locacao('adoraveis mulheres', 45678912354, 1)
+        
+    if not session.query(Multa).first():
+        
+        multa_giovana = Multa(valor=20.00, data=date(2024,10,30), cliente_cpf=76894514523, paga=False)
+        session.add(multa_giovana)
+        
+        multa_lavinia = Multa(valor=10.00, data=date(2024,11,5), cliente_cpf=32415678964, paga=False)
+        session.add(multa_lavinia)
+        session.commit()
     print("Dados iniciais inseridos com sucesso!")
 
 def main():
@@ -496,7 +502,7 @@ def main():
         else:
             print("Opção inválida! Tente novamente.")
 
-# Menu de opções para Funcionário
+
 def menu_funcionario(funcionario):
     while True:
         print(f"Bem-vindo, {funcionario.nome}!")
@@ -576,7 +582,7 @@ def menu_cliente(cliente):
         elif opcao == '2':
             id_locacao = int(input("Digite o ID da locação: "))
             nomeFilme = input("Digite o nome do filme a ser devolvido: ")
-            cpf_cliente = cliente.nome
+            cpf_cliente = cliente.cpf
             fazer_devolucao(id_locacao, nomeFilme, cpf_cliente)
             
         elif opcao == '3':
@@ -586,7 +592,7 @@ def menu_cliente(cliente):
             renovar_filme(id_locacao, nomeFilme, cpf_cliente)
         
         elif opcao == '4':
-            pagar_multa()
+            pagar_multa(cliente.cpf)
             
         elif opcao == '5':
             historico_locacoes(cliente.cpf)
@@ -602,11 +608,9 @@ def menu_cliente(cliente):
             
             
 if __name__ == "__main__":
-    # Criar as tabelas, caso ainda não existam
     Base.metadata.create_all(engine)
 
     # Inserir dados iniciais no banco de dados
     inicializar()
 
-    # Chama o menu principal
     main()
