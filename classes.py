@@ -16,6 +16,9 @@ class cpfExistente(Exception):
 
 class LimiteLocacao(Exception):
     pass
+    
+class MenorDeIdade(Exception):
+    pass
 
 
 class Diretor(Base):
@@ -158,7 +161,7 @@ def cadastrar_cliente(nome, cpf, dataNasc, sexo):
         idade = data_atual.year - dataNasc.year - ((data_atual.month, data_atual.day) < (dataNasc.month, dataNasc.day))
         
         if idade < 18:
-            raise ValueError("O cliente deve ser maior de idade para se cadastrar.")
+            raise MenorDeIdade("O cliente deve ser maior de idade para se cadastrar.")
         
         cliente = Cliente(nome=nome, cpf=cpf, dataNasc=dataNasc, sexo=sexo)
         session.add(cliente)
@@ -167,7 +170,7 @@ def cadastrar_cliente(nome, cpf, dataNasc, sexo):
     
     except cpfExistente as e:
         print(e)
-    except ValueError as e:
+    except MenorDeIdade as e:
         print(e)
 
 def excluir_cliente(cpf):
